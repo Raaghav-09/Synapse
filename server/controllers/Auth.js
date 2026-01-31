@@ -256,7 +256,7 @@ exports.changePassword = async (req, res) => {
 					`Password updated successfully for ${updatedUserDetails.firstName} ${updatedUserDetails.lastName}`
 				)
 			);
-			console.log("Email sent successfully:", emailResponse.response);
+			console.log("Email sent successfully:", emailResponse);
 		} catch (error) {
 			// If there's an error sending the email, log the error and return a 500 (Internal Server Error) error
 			console.error("Error occurred while sending email:", error);
