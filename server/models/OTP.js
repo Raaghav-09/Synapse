@@ -4,7 +4,7 @@ const emailTemplate = require("../mail/templates/emailVerificationTemplate");
 const OTPSchema = new mongoose.Schema({
 	email: {
 		type: String,
-		required: true,
+		required: true ,
 	},
 	otp: {
 		type: String,
@@ -48,6 +48,6 @@ OTPSchema.pre("save", async function (next) {
 	next();
 });
 
-const OTP = mongoose.model("OTP", OTPSchema);
+const OTP = mongoose.model("OTP", OTPSchema) ;
 
-module.exports = OTP;
+module.exports = OTP ;
