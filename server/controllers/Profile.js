@@ -1,5 +1,6 @@
 const Profile = require("../models/Profile");
 const User = require("../models/User");
+const Course = require("../models/Course");
 const { uploadImageToCloudinary } = require("../utils/imageUploader");
 // Method for updating a profile
 exports.updateProfile = async (req, res) => {
@@ -139,3 +140,36 @@ exports.getEnrolledCourses = async (req, res) => {
       })
     }
 };
+
+exports.instructorDashboard = async (req, res) => {
+  try {
+    const courseDetails = await Course.find({ instructor: req.user.id })
+
+    const courseData = courseDetails.map((course) => {
+      const totalStudentsEnrolled = course.studentsEnrolled.length
+      const totalAmountGenerated = totalStudentsEnrolled * course.price
+
+      // Create a new object with the additional fields
+      const courseDataWithStats = {
+        _id: course._id,
+        courseName: course.courseName,
+        courseDescription: course.courseDescription,
+        totalStudentsEnrolled,
+        totalAmountGenerated,
+      }
+
+      return courseDataWithStats
+    })
+
+    res.status(200).json({ 
+      success: true,
+      courses: courseData 
+    })
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ 
+      success: false,
+      message: "Server Error" 
+    })
+  }
+}
