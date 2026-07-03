@@ -1,10 +1,11 @@
 const express = require('express') ; 
 const app = express() ; 
 
-const userRoutes = require('./routes/User') ; 
-const profileRoutes = require('./routes/Profile') ; 
-const paymentRoutes = require('./routes/Payments') ; 
-const courseRoutes = require('./routes/Course') ; 
+const userRoutes = require('./routes/User') ;
+const profileRoutes = require('./routes/Profile') ;
+const paymentRoutes = require('./routes/Payments') ;
+const courseRoutes = require('./routes/Course') ;
+const assistantRoutes = require('./routes/DoubtAssistant') ;
 
 const database = require('./config/database') ; 
 const cookieParser = require('cookie-parser') ; 
@@ -36,10 +37,11 @@ app.use(fileUpload({
 cloudinaryConnect() ; 
 
 // routes 
-app.use('/api/v1/auth' , userRoutes ) ; 
-app.use('/api/v1/profile' , profileRoutes) ; 
-app.use('/api/v1/course' , courseRoutes ) ; 
+app.use('/api/v1/auth' , userRoutes ) ;
+app.use('/api/v1/profile' , profileRoutes) ;
+app.use('/api/v1/course' , courseRoutes ) ;
 app.use('/api/v1/payment' , paymentRoutes) ;
+app.use('/api/v1/assistant' , assistantRoutes) ;
 
 // default routes
 app.get('/',(req , res) => {

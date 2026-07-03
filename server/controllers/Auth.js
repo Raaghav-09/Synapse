@@ -8,14 +8,17 @@ const { passwordUpdated } = require("../mail/templates/passwordUpdate");
 const Profile = require("../models/Profile");
 require("dotenv").config();
 
+const escapeRegex = (value = "") => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 // Signup Controller for Registering USers
 
 exports.signup = async (req, res) => {
 	try {
 		// Destructure fields from the request body
 		const {firstName,lastName,email,password,confirmPassword,accountType,contactNumber,otp,} = req.body;
+		const normalizedEmail = email?.toLowerCase().trim();
 		// Check if All Details are there or not
-		if ( !firstName || !lastName || !email || !password || !confirmPassword || !otp ) {
+		if ( !firstName || !lastName || !normalizedEmail || !password || !confirmPassword || !otp ) {
 			return res.status(403).send({
 				success: false,
 				message: "All Fields are required",
@@ -31,7 +34,9 @@ exports.signup = async (req, res) => {
 		}
 
 		// Check if user already exists
-		const existingUser = await User.findOne({ email });
+		const existingUser = await User.findOne({
+			email: new RegExp(`^${escapeRegex(normalizedEmail)}$`, "i"),
+		});
 		if (existingUser) {
 			return res.status(400).json({
 				success: false,
@@ -40,7 +45,7 @@ exports.signup = async (req, res) => {
 		}
 
 		// Find the most recent OTP for the email
-		const response = await OTP.find({ email }).sort({ createdAt: -1 }).limit(1);
+		const response = await OTP.find({ email: normalizedEmail }).sort({ createdAt: -1 }).limit(1);
 		console.log(response);
 		if (response.length === 0) {
 			// OTP not found for the email
@@ -73,7 +78,7 @@ exports.signup = async (req, res) => {
 		const user = await User.create({
 			firstName,
 			lastName,
-			email,
+			email: normalizedEmail,
 			contactNumber,
 			password: hashedPassword,
 			accountType: accountType,
@@ -101,9 +106,10 @@ exports.login = async (req, res) => {
 	try {
 		// Get email and password from request body
 		const { email, password } = req.body;
+		const normalizedEmail = email?.toLowerCase().trim();
 
 		// Check if email or password is missing
-		if (!email || !password) {
+		if (!normalizedEmail || !password) {
 			// Return 400 Bad Request status code with error message
 			return res.status(400).json({
 				success: false,
@@ -112,7 +118,9 @@ exports.login = async (req, res) => {
 		}
 
 		// Find user with provided email
-		const user = await User.findOne({ email }).populate("additionalDetails");
+		const user = await User.findOne({
+			email: new RegExp(`^${escapeRegex(normalizedEmail)}$`, "i"),
+		}).populate("additionalDetails");
 
 		// If user not found with provided email
 		if (!user) {
@@ -124,7 +132,7 @@ exports.login = async (req, res) => {
 		}
 
 		// Generate JWT token and Compare Password
-		if (await bcrypt.compare(password, user.password)) {
+		if (user.password && await bcrypt.compare(password, user.password)) {
 			const token = jwt.sign(
 				{ email: user.email, id: user._id, accountType : user.accountType },
 				process.env.JWT_SECRET,

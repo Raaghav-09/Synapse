@@ -9,6 +9,7 @@ import { BigPlayButton, Player } from "video-react"
 import { markLectureAsComplete } from "../../../services/operations/courseDetailsAPI"
 import { updateCompletedLectures } from "../../../slices/viewCourseSlice"
 import IconBtn from "../../Common/IconBtn"
+import DoubtAssistant from "./DoubtAssistant"
 
 const VideoDetails = () => {
   const { courseId, sectionId, subSectionId } = useParams()
@@ -241,6 +242,8 @@ const VideoDetails = () => {
 
       <h1 className="mt-4 text-3xl font-semibold">{videoData?.title}</h1>
       <p className="pt-2 pb-6">{videoData?.description}</p>
+
+      <DoubtAssistant courseId={courseId} subSectionId={subSectionId} />
     </div>
   )
 }

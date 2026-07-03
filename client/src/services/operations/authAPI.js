@@ -88,9 +88,10 @@ export function login(email, password, navigate) {
     const toastId = toast.loading("Loading...")
     dispatch(setLoading(true))
     try {
+      const normalizedEmail = email?.trim().toLowerCase()
       const response = await apiConnector("POST", LOGIN_API, {
-        email,
-        password,
+        email: normalizedEmail,
+        password: password?.trim(),
       })
 
       console.log("LOGIN API RESPONSE............", response)
@@ -111,7 +112,7 @@ export function login(email, password, navigate) {
       navigate("/dashboard/my-profile")
     } catch (error) {
       console.log("LOGIN API ERROR............", error)
-      toast.error("Login Failed")
+      toast.error(error.response?.data?.message || "Login Failed")
     }
     dispatch(setLoading(false))
     toast.dismiss(toastId)
