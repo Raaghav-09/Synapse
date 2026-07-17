@@ -9,6 +9,7 @@ import { Route, Routes, useNavigate } from "react-router-dom"
 import Navbar from "./components/Common/Navbar"
 import OpenRoute from "./components/core/Auth/OpenRoute"
 import PrivateRoute from "./components/core/Auth/PrivateRoute"
+import Admin from "./components/core/Dashboard/Admin"
 import AddCourse from "./components/core/Dashboard/AddCourse"
 import Cart from "./components/core/Dashboard/Cart"
 import EditCourse from "./components/core/Dashboard/EditCourse"
@@ -130,6 +131,10 @@ function App() {
               />
               <Route path="/dashboard/cart" element={<Cart />} />
             </>
+          )}
+          {/* Route only for Admins */}
+          {user?.accountType === ACCOUNT_TYPE.ADMIN && (
+            <Route path="dashboard/admin" element={<Admin />} />
           )}
           <Route path="dashboard/settings" element={<Settings />} />
         </Route>

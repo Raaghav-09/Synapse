@@ -1,5 +1,5 @@
 export const categories = {
-  CATEGORIES_API: "/course/getAllCategories",
+  CATEGORIES_API: "/course/showAllCategories",
 };
 
 export const ratingsEndpoints = {
@@ -29,7 +29,7 @@ export const courseEndpoints = {
   GET_ALL_COURSE_API: "/course/getAllCourses",
   COURSE_DETAILS_API: "/course/getCourseDetails",
   EDIT_COURSE_API: "/course/editCourse",
-  COURSE_CATEGORIES_API: "/course/getAllCategories",
+  COURSE_CATEGORIES_API: "/course/showAllCategories",
   CREATE_COURSE_API: "/course/createCourse",
   CREATE_SECTION_API: "/course/addSection",
   CREATE_SUBSECTION_API: "/course/addSubSection",
@@ -63,4 +63,8 @@ export const studentEndpoints = {
   COURSE_PAYMENT_API: "/payment/capturePayment",
   COURSE_VERIFY_API: "/payment/verifyPayment",
   SEND_PAYMENT_SUCCESS_EMAIL_API: "/payment/sendPaymentSuccessEmail",
+};
+
+export const adminEndpoints = {
+  CREATE_CATEGORY_API: "/course/createCategory",
 };
