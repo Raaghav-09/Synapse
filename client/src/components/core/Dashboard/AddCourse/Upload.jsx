@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { useDropzone } from "react-dropzone"
 import { FiUploadCloud } from "react-icons/fi"
 import { useSelector } from "react-redux"
@@ -21,7 +21,6 @@ export default function Upload({
   const [previewSource, setPreviewSource] = useState(
     viewData ? viewData : editData ? editData : ""
   )
-  const inputRef = useRef(null)
 
   const onDrop = (acceptedFiles) => {
     const file = acceptedFiles[0]
@@ -33,8 +32,8 @@ export default function Upload({
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: !video
-      ? { "image/*": [".jpeg", ".jpg", ".png"] }
-      : { "video/*": [".mp4"] },
+      ? { "image/*": [".jpeg", ".jpg", ".png", ".webp"] }
+      : { "video/*": [".mp4", ".mov", ".webm", ".mkv", ".avi"] },
     onDrop,
   })
 
@@ -97,7 +96,10 @@ export default function Upload({
             className="flex w-full flex-col items-center p-6"
             {...getRootProps()}
           >
-            <input {...getInputProps()} ref={inputRef} />
+            {/* Do NOT add a ref here — getInputProps() supplies react-dropzone's
+                own ref, and overriding it stops click-to-browse from opening
+                the file dialog. */}
+            <input {...getInputProps()} />
             <div className="grid aspect-square w-14 place-items-center rounded-full bg-pure-greys-800">
               <FiUploadCloud className="text-2xl text-yellow-50" />
             </div>
