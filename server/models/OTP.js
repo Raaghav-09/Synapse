@@ -10,6 +10,12 @@ const OTPSchema = new mongoose.Schema({
 		type: String,
 		required: true,
 	},
+	// Incremented on every wrong guess; the OTP is destroyed once this hits
+	// the limit, so a 6-digit code cannot be brute-forced within its TTL.
+	attempts: {
+		type: Number,
+		default: 0,
+	},
 	createdAt: {
 		type: Date,
 		default: Date.now,

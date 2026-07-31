@@ -10,6 +10,9 @@ require("dotenv").config();
 
 const escapeRegex = (value = "") => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+// How many wrong guesses an OTP tolerates before it is destroyed.
+const MAX_OTP_ATTEMPTS = 5;
+
 // Signup Controller for Registering USers
 
 exports.signup = async (req, res) => {
@@ -45,28 +48,46 @@ exports.signup = async (req, res) => {
 		}
 
 		// Find the most recent OTP for the email
-		const response = await OTP.find({ email: normalizedEmail }).sort({ createdAt: -1 }).limit(1);
-		console.log(response);
-		if (response.length === 0) {
-			// OTP not found for the email
+		const otpRecord = await OTP.findOne({ email: normalizedEmail }).sort({
+			createdAt: -1,
+		});
+
+		if (!otpRecord) {
 			return res.status(400).json({
 				success: false,
-				message: "The OTP is not valid",
+				message: "The OTP is invalid or has expired",
 			});
-		} else if (otp !== response[0].otp) {
-			// Invalid OTP
+		}
+
+		// Cap the number of guesses — a 6-digit numeric code is only 10^6
+		// possibilities, which is trivially brute-forced without a limit.
+		if (otpRecord.attempts >= MAX_OTP_ATTEMPTS) {
+			await OTP.deleteOne({ _id: otpRecord._id });
+			return res.status(400).json({
+				success: false,
+				message: "Too many incorrect attempts. Please request a new OTP.",
+			});
+		}
+
+		if (otp !== otpRecord.otp) {
+			await OTP.updateOne({ _id: otpRecord._id }, { $inc: { attempts: 1 } });
 			return res.status(400).json({
 				success: false,
 				message: "The OTP is not valid",
 			});
 		}
 
+		// Consume the OTP so it cannot be replayed within its TTL window.
+		await OTP.deleteOne({ _id: otpRecord._id });
+
 		// Hash the password
 		const hashedPassword = await bcrypt.hash(password, 10);
 
-		// Create the user
-		let approved = "";
-		approved === "Instructor" ? (approved = false) : (approved = true);
+		// Instructors start unapproved and require review; everyone else is
+		// approved immediately. (This previously compared an empty string to
+		// "Instructor", so the condition was always false and every account —
+		// including instructors — was auto-approved.)
+		const approved = accountType !== "Instructor";
 
 		// Create the Additional Profile For User
 		const profileDetails = await Profile.create({
@@ -117,17 +138,20 @@ exports.login = async (req, res) => {
 			});
 		}
 
-		// Find user with provided email
+		// Emails are stored lowercase, so an exact match works and can use the
+		// index — unlike the previous case-insensitive regex, which forced a
+		// full collection scan on every login attempt.
 		const user = await User.findOne({
-			email: new RegExp(`^${escapeRegex(normalizedEmail)}$`, "i"),
+			email: normalizedEmail,
 		}).populate("additionalDetails");
 
-		// If user not found with provided email
+		// Deliberately identical to the wrong-password message below. Telling
+		// the caller which of the two failed lets an attacker enumerate which
+		// email addresses have accounts.
 		if (!user) {
-			// Return 401 Unauthorized status code with error message
 			return res.status(401).json({
 				success: false,
-				message: `User is not Registered with Us Please SignUp to Continue`,
+				message: `Invalid email or password`,
 			});
 		}
 
@@ -145,9 +169,17 @@ exports.login = async (req, res) => {
 			user.token = token;
 			user.password = undefined;
 			// Set cookie for token and return success response
+			// In production the SPA and API sit on different sites (e.g. Vercel
+			// + Render), so the cookie needs SameSite=None + Secure or the
+			// browser drops it. Locally that combination would break http://,
+			// hence the environment switch.
+			const isProduction = process.env.NODE_ENV === "production";
 			const options = {
-				expires: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+				// match the 24h JWT expiry rather than outliving the token
+				expires: new Date(Date.now() + 24 * 60 * 60 * 1000),
 				httpOnly: true,
+				sameSite: isProduction ? "none" : "lax",
+				secure: isProduction,
 			};
 			res.cookie("token", token, options).status(200).json({
 				success: true,
@@ -158,7 +190,8 @@ exports.login = async (req, res) => {
 		} else {
 			return res.status(401).json({
 				success: false,
-				message: `Password is incorrect`,
+				// same message as the unknown-email case above, on purpose
+				message: `Invalid email or password`,
 			});
 		}
 	} catch (error) {
@@ -174,11 +207,17 @@ exports.login = async (req, res) => {
 exports.sendotp = async (req, res) => {
 	try {
 		const { email } = req.body;
+		const normalizedEmail = email?.toLowerCase().trim();
+
+		if (!normalizedEmail) {
+			return res.status(400).json({
+				success: false,
+				message: "Email is required",
+			});
+		}
 
 		// Check if user is already present
-		// Find user with provided email
-		const checkUserPresent = await User.findOne({ email });
-		// to be used in case of signup
+		const checkUserPresent = await User.findOne({ email: normalizedEmail });
 
 		// If user found with provided email
 		if (checkUserPresent) {
@@ -203,9 +242,13 @@ exports.sendotp = async (req, res) => {
 				upperCaseAlphabets: false,
 			});
 		}
-		const otpPayload = { email, otp };
-		const otpBody = await OTP.create(otpPayload);
-		console.log("OTP Body", otpBody);
+		const otpPayload = { email: normalizedEmail, otp };
+		await OTP.create(otpPayload);
+
+		// The OTP is returned in the response so signup can be tested and demoed
+		// without access to the target mailbox.
+		// NOTE: this means anyone who can call this endpoint can verify an email
+		// address they do not own — remove `otp` below before any real use.
 		res.status(200).json({
 			success: true,
 			message: `OTP Sent Successfully`,

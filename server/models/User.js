@@ -16,6 +16,12 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
+    // Stored lowercase so exact-match lookups can use the index, and unique so
+    // the database — not a check-then-act in application code — is what stops
+    // two concurrent signups creating duplicate accounts.
+    lowercase: true,
+    unique: true,
+    index: true,
   },
   password: {
     type: String,
