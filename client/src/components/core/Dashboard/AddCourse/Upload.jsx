@@ -15,6 +15,7 @@ export default function Upload({
   video = false,
   viewData = null,
   editData = null,
+  required = true,
 }) {
   const { course } = useSelector((state) => state.course)
   const [selectedFile, setSelectedFile] = useState(null)
@@ -47,9 +48,9 @@ export default function Upload({
   }
 
   useEffect(() => {
-    register(name, { required: true })
+    register(name, { required })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [register])
+  }, [register, required])
 
   useEffect(() => {
     setValue(name, selectedFile)
@@ -59,7 +60,13 @@ export default function Upload({
   return (
     <div className="flex flex-col space-y-2">
       <label className="text-sm text-richblack-5" htmlFor={name}>
-        {label} {!viewData && <sup className="text-pink-200">*</sup>}
+        {label}{" "}
+        {!viewData &&
+          (required ? (
+            <sup className="text-pink-200">*</sup>
+          ) : (
+            <span className="text-xs text-richblack-400">(optional)</span>
+          ))}
       </label>
       <div
         className={`${

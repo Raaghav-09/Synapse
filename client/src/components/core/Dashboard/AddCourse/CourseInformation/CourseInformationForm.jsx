@@ -119,7 +119,11 @@ export default function CourseInformationForm() {
             JSON.stringify(data.courseRequirements)
           )
         }
-        if (currentValues.courseImage !== course.thumbnail) {
+        // only send a thumbnail when a new file was actually picked
+        if (
+          currentValues.courseImage !== course.thumbnail &&
+          data.courseImage instanceof File
+        ) {
           formData.append("thumbnailImage", data.courseImage)
         }
         // console.log("Edit Form data: ", formData)
@@ -145,7 +149,10 @@ export default function CourseInformationForm() {
     formData.append("category", data.courseCategory)
     formData.append("status", COURSE_STATUS.DRAFT)
     formData.append("instructions", JSON.stringify(data.courseRequirements))
-    formData.append("thumbnailImage", data.courseImage)
+    // thumbnail is optional — appending a null here would send the string "null"
+    if (data.courseImage instanceof File) {
+      formData.append("thumbnailImage", data.courseImage)
+    }
     setLoading(true)
     const result = await addCourseDetails(formData, token)
     if (result) {
@@ -265,6 +272,7 @@ export default function CourseInformationForm() {
         setValue={setValue}
         errors={errors}
         editData={editCourse ? course?.thumbnail : null}
+        required={false}
       />
       {/* Benefits of the course */}
       <div className="flex flex-col space-y-2">

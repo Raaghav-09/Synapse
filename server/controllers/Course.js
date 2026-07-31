@@ -21,8 +21,9 @@ exports.createCourse = async (req, res) => {
 			instructions,
 		} = req.body;
 
-		// Get thumbnail image from request files
-		const thumbnail = req.files.thumbnailImage;
+		// Get thumbnail image from request files (optional — req.files is null
+		// when the instructor submits the form without picking an image)
+		const thumbnail = req.files?.thumbnailImage;
 
 		// Check if any of the required fields are missing
 		if (
@@ -31,7 +32,6 @@ exports.createCourse = async (req, res) => {
 			!whatYouWillLearn ||
 			!price ||
 			!tag ||
-			!thumbnail ||
 			!category
 		) {
 			return res.status(400).json({
@@ -62,12 +62,18 @@ exports.createCourse = async (req, res) => {
 				message: "Category Details Not Found",
 			});
 		}
-		// Upload the Thumbnail to Cloudinary
-		const thumbnailImage = await uploadImageToCloudinary(
-			thumbnail,
-			process.env.FOLDER_NAME
-		);
-		console.log(thumbnailImage);
+		// Upload the Thumbnail to Cloudinary if one was provided, otherwise fall
+		// back to a generated placeholder so the catalog/cards still render.
+		let thumbnailUrl = `https://api.dicebear.com/5.x/initials/svg?seed=${encodeURIComponent(
+			courseName
+		)}`;
+		if (thumbnail) {
+			const thumbnailImage = await uploadImageToCloudinary(
+				thumbnail,
+				process.env.FOLDER_NAME
+			);
+			thumbnailUrl = thumbnailImage.secure_url;
+		}
 		// Create a new course with the given details
 		const newCourse = await Course.create({
 			courseName,
@@ -77,7 +83,7 @@ exports.createCourse = async (req, res) => {
 			price,
 			tag: tag,
 			category: categoryDetails._id,
-			thumbnail: thumbnailImage.secure_url,
+			thumbnail: thumbnailUrl,
 			status: status,
 			instructions: instructions,
 		});
@@ -217,7 +223,7 @@ exports.editCourse = async (req, res) => {
     }
 
     // If Thumbnail Image is found, update it
-    if (req.files) {
+    if (req.files?.thumbnailImage) {
       const thumbnail = req.files.thumbnailImage
       const thumbnailImage = await uploadImageToCloudinary(
         thumbnail,
