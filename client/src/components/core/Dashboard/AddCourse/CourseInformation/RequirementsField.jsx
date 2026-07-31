@@ -14,29 +14,34 @@ export default function RequirementsField({
   const [requirementsList, setRequirementsList] = useState([])
 
   useEffect(() => {
-    if (editCourse) {
-      setRequirementsList(course?.instructions)
-    }
-    register(name, { required: true, validate: (value) => value.length > 0 })
+    const initialList =
+      editCourse && Array.isArray(course?.instructions) ? course.instructions : []
+    setRequirementsList(initialList)
+    register(name, {
+      required: true,
+      validate: (value) => Array.isArray(value) && value.length > 0,
+    })
+    setValue(name, initialList)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => {
-    setValue(name, requirementsList)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requirementsList])
+  // shouldValidate clears the "required" error as soon as an item is added,
+  // rather than leaving it on screen until the next submit attempt.
+  const commitList = (newList) => {
+    setRequirementsList(newList)
+    setValue(name, newList, { shouldValidate: true })
+  }
 
   const handleAddRequirement = () => {
-    if (requirement) {
-      setRequirementsList([...requirementsList, requirement])
-      setRequirement("")
+    const value = requirement.trim()
+    if (value && !requirementsList.includes(value)) {
+      commitList([...requirementsList, value])
     }
+    setRequirement("")
   }
 
   const handleRemoveRequirement = (index) => {
-    const updatedRequirements = [...requirementsList]
-    updatedRequirements.splice(index, 1)
-    setRequirementsList(updatedRequirements)
+    commitList(requirementsList.filter((_, i) => i !== index))
   }
 
   return (
@@ -50,6 +55,13 @@ export default function RequirementsField({
           id={name}
           value={requirement}
           onChange={(e) => setRequirement(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault()
+              handleAddRequirement()
+            }
+          }}
+          onBlur={handleAddRequirement}
           className="form-style w-full"
         />
         <button

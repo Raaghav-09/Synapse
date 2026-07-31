@@ -21,18 +21,33 @@ export default function ChipInput({
   const [chips, setChips] = useState([])
 
   useEffect(() => {
-    if (editCourse) {
-      // console.log(course)
-      setChips(course?.tag)
-    }
-    register(name, { required: true, validate: (value) => value.length > 0 })
+    const initialChips =
+      editCourse && Array.isArray(course?.tag) ? course.tag : []
+    setChips(initialChips)
+    register(name, {
+      required: true,
+      validate: (value) => Array.isArray(value) && value.length > 0,
+    })
+    setValue(name, initialChips)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => {
-    setValue(name, chips)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chips])
+  // Keep local state and the form value in sync in one place. shouldValidate
+  // re-runs validation immediately, so the "required" error clears as soon as
+  // a chip is added instead of lingering until the next submit.
+  const commitChips = (newChips) => {
+    setChips(newChips)
+    setValue(name, newChips, { shouldValidate: true })
+  }
+
+  // Turn whatever is currently typed into a chip
+  const addChip = (rawValue) => {
+    const chipValue = rawValue.trim()
+    if (chipValue && !chips.includes(chipValue)) {
+      commitChips([...chips, chipValue])
+    }
+    return chipValue !== ""
+  }
 
   // Function to handle user input when chips are added
   const handleKeyDown = (event) => {
@@ -40,23 +55,24 @@ export default function ChipInput({
     if (event.key === "Enter" || event.key === ",") {
       // Prevent the default behavior of the event
       event.preventDefault()
-      // Get the input value and remove any leading/trailing spaces
-      const chipValue = event.target.value.trim()
-      // Check if the input value exists and is not already in the chips array
-      if (chipValue && !chips.includes(chipValue)) {
-        // Add the chip to the array and clear the input
-        const newChips = [...chips, chipValue]
-        setChips(newChips)
+      if (addChip(event.target.value)) {
         event.target.value = ""
       }
+    }
+  }
+
+  // Commit a half-typed tag when the user clicks away (e.g. straight onto
+  // "Next") instead of silently discarding it.
+  const handleBlur = (event) => {
+    if (addChip(event.target.value)) {
+      event.target.value = ""
     }
   }
 
   // Function to handle deletion of a chip
   const handleDeleteChip = (chipIndex) => {
     // Filter the chips array to remove the chip with the given index
-    const newChips = chips.filter((_, index) => index !== chipIndex)
-    setChips(newChips)
+    commitChips(chips.filter((_, index) => index !== chipIndex))
   }
 
   // Render the component
@@ -93,6 +109,7 @@ export default function ChipInput({
           type="text"
           placeholder={placeholder}
           onKeyDown={handleKeyDown}
+          onBlur={handleBlur}
           className="form-style w-full"
         />
       </div>
