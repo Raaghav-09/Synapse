@@ -1,6 +1,7 @@
 const Course = require("../models/Course");
 const Category = require("../models/Category");
 const User = require("../models/User");
+const CourseProgress = require("../models/CourseProgress");
 const { uploadImageToCloudinary } = require("../utils/imageUploader");
 
 // Function to create a new course
@@ -406,10 +407,18 @@ exports.getFullCourseDetails = async (req, res) => {
       })
     }
 
+    // The ViewCourse page reads data.completedVideos to restore progress on
+    // reload — without this, ticks reset every time the page is refreshed.
+    const courseProgress = await CourseProgress.findOne({
+      courseID: courseId,
+      userId: userId,
+    })
+
     return res.status(200).json({
       success: true,
       data: {
         courseDetails,
+        completedVideos: courseProgress?.completedVideos ?? [],
       },
     })
   } catch (error) {
