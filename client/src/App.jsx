@@ -1,4 +1,5 @@
 import { useEffect } from "react"
+import { Analytics } from "@vercel/analytics/react"
 import "./App.css"
 // Redux
 import { useDispatch, useSelector } from "react-redux"
@@ -160,6 +161,7 @@ function App() {
         {/* 404 Page */}
         <Route path="*" element={<Error />} />
       </Routes>
+      <Analytics />
     </div>
   )
 }
