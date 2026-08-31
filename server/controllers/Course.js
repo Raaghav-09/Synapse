@@ -2,7 +2,13 @@ const Course = require("../models/Course");
 const Category = require("../models/Category");
 const User = require("../models/User");
 const CourseProgress = require("../models/CourseProgress");
-const { uploadImageToCloudinary } = require("../utils/imageUploader");
+const { verifyCloudinaryAsset } = require("../utils/cloudinaryAsset");
+
+const parseArrayField = (value) => {
+	if (Array.isArray(value)) return value;
+	if (typeof value !== "string") return value;
+	return JSON.parse(value);
+};
 
 // Function to create a new course
 exports.createCourse = async (req, res) => {
@@ -22,9 +28,9 @@ exports.createCourse = async (req, res) => {
 			instructions,
 		} = req.body;
 
-		// Get thumbnail image from request files (optional — req.files is null
-		// when the instructor submits the form without picking an image)
-		const thumbnail = req.files?.thumbnailImage;
+		// The browser uploads the file directly to Cloudinary and sends back the
+		// signed upload metadata. No media bytes pass through this API.
+		const thumbnail = req.body.thumbnail;
 
 		// Check if any of the required fields are missing
 		if (
@@ -69,11 +75,7 @@ exports.createCourse = async (req, res) => {
 			courseName
 		)}`;
 		if (thumbnail) {
-			const thumbnailImage = await uploadImageToCloudinary(
-				thumbnail,
-				process.env.FOLDER_NAME
-			);
-			thumbnailUrl = thumbnailImage.secure_url;
+			thumbnailUrl = verifyCloudinaryAsset(thumbnail, "image").secureUrl;
 		}
 		// Create a new course with the given details
 		const newCourse = await Course.create({
@@ -82,11 +84,11 @@ exports.createCourse = async (req, res) => {
 			instructor: instructorDetails._id,
 			whatYouWillLearn: whatYouWillLearn,
 			price,
-			tag: tag,
+			tag: parseArrayField(tag),
 			category: categoryDetails._id,
 			thumbnail: thumbnailUrl,
 			status: status,
-			instructions: instructions,
+			instructions: parseArrayField(instructions),
 		});
 
 		// Add the new course to the User Schema of the Instructor
@@ -223,18 +225,14 @@ exports.editCourse = async (req, res) => {
       })
     }
 
-    // If Thumbnail Image is found, update it
-    if (req.files?.thumbnailImage) {
-      const thumbnail = req.files.thumbnailImage
-      const thumbnailImage = await uploadImageToCloudinary(
-        thumbnail,
-        process.env.FOLDER_NAME
-      )
-      course.thumbnail = thumbnailImage.secure_url
+    // The file has already been uploaded directly to Cloudinary. Verify its
+    // signed response before accepting the resulting URL.
+    if (updates.thumbnail) {
+      course.thumbnail = verifyCloudinaryAsset(updates.thumbnail, "image").secureUrl
     }
 
     // Check if category is being changed
-    if (updates.category && updates.category !== course.category) {
+    if (updates.category && String(updates.category) !== String(course.category)) {
       // Remove course from old category
       if (course.category) {
         await Category.findByIdAndUpdate(
@@ -256,9 +254,13 @@ exports.editCourse = async (req, res) => {
 
     // Update only the fields that are present in the request body
     for (const key in updates) {
-      if (updates.hasOwnProperty(key) && key !== "courseId") {
+      if (
+        updates.hasOwnProperty(key) &&
+        key !== "courseId" &&
+        key !== "thumbnail"
+      ) {
         if (key === "tag" || key === "instructions") {
-          course[key] = JSON.parse(updates[key])
+          course[key] = parseArrayField(updates[key])
         } else {
           course[key] = updates[key]
         }

@@ -7,13 +7,13 @@ const paymentRoutes = require('./routes/Payments') ;
 const courseRoutes = require('./routes/Course') ;
 const contactRoutes = require('./routes/Contact') ;
 const assistantRoutes = require('./routes/DoubtAssistant') ;
+const uploadRoutes = require('./routes/Upload') ;
 
 const database = require('./config/database') ; 
 const cookieParser = require('cookie-parser') ; 
 const cors = require('cors') ;
 const helmet = require('helmet') ;
 const {cloudinaryConnect} = require('./config/cloudinary') ; 
-const fileUpload = require('express-fileupload') ; 
 const dotenv = require('dotenv') ; 
 
 dotenv.config() ; 
@@ -47,15 +47,6 @@ app.use(
     credentials : true
   })
 )
-app.use(fileUpload({
-  useTempFiles : true ,
-  tempFileDir : '/tmp' ,
-  // Without a cap, one request can stream an unbounded file to disk.
-  limits : { fileSize : 100 * 1024 * 1024 } ,   // 100 MB
-  abortOnLimit : true ,
-  responseOnLimit : 'File is too large (max 100 MB)' ,
-})) ;
-
 // cloudinary connection
 cloudinaryConnect() ; 
 
@@ -66,6 +57,7 @@ app.use('/api/v1/course' , courseRoutes ) ;
 app.use('/api/v1/payment' , paymentRoutes) ;
 app.use('/api/v1/assistant' , assistantRoutes) ;
 app.use('/api/v1/contact' , contactRoutes) ;
+app.use('/api/v1/upload' , uploadRoutes) ;
 
 // default routes
 app.get('/',(req , res) => {

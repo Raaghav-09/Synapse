@@ -1,7 +1,7 @@
 const Profile = require("../models/Profile");
 const User = require("../models/User");
 const Course = require("../models/Course");
-const { uploadImageToCloudinary } = require("../utils/imageUploader");
+const { verifyCloudinaryAsset } = require("../utils/cloudinaryAsset");
 // Method for updating a profile
 exports.updateProfile = async (req, res) => {
 	try {
@@ -88,18 +88,12 @@ exports.getAllUserDetails = async (req, res) => {
 
 exports.updateDisplayPicture = async (req, res) => {
     try {
-      const displayPicture = req.files.displayPicture
+      const { displayPicture } = req.body
       const userId = req.user.id
-      const image = await uploadImageToCloudinary(
-        displayPicture,
-        process.env.FOLDER_NAME,
-        1000,
-        1000
-      )
-      console.log(image)
+      const image = verifyCloudinaryAsset(displayPicture, "image")
       const updatedProfile = await User.findByIdAndUpdate(
         { _id: userId },
-        { image: image.secure_url },
+        { image: image.secureUrl },
         { new: true }
       )
       res.send({
