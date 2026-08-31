@@ -3,6 +3,7 @@ import { toast } from "react-hot-toast"
 import { setUser } from "../../slices/profileSlice"
 import { apiConnector } from "../apiConnector"
 import { settingsEndpoints } from "../apis"
+import { uploadToCloudinary } from "../cloudinaryUpload"
 import { logout } from "./authAPI"
 
 const {
@@ -12,16 +13,16 @@ const {
   DELETE_PROFILE_API,
 } = settingsEndpoints
 
-export function updateDisplayPicture(token, formData) {
+export function updateDisplayPicture(token, imageFile) {
   return async (dispatch) => {
     const toastId = toast.loading("Loading...")
     try {
+      const displayPicture = await uploadToCloudinary(imageFile, token, "image")
       const response = await apiConnector(
         "PUT",
         UPDATE_DISPLAY_PICTURE_API,
-        formData,
+        { displayPicture },
         {
-          "Content-Type": "multipart/form-data",
           Authorization: `Bearer ${token}`,
         }
       )

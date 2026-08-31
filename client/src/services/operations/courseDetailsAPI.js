@@ -1,9 +1,9 @@
 import { toast } from "react-hot-toast"
 
-import { updateCompletedLectures } from "../../slices/viewCourseSlice"
 // import { setLoading } from "../../slices/profileSlice";
 import { apiConnector } from "../apiConnector"
 import { courseEndpoints } from "../apis"
+import { uploadToCloudinary } from "../cloudinaryUpload"
 
 const {
   COURSE_DETAILS_API,
@@ -87,8 +87,15 @@ export const addCourseDetails = async (data, token) => {
   let result = null
   const toastId = toast.loading("Loading...")
   try {
-    const response = await apiConnector("POST", CREATE_COURSE_API, data, {
-      "Content-Type": "multipart/form-data",
+    const { thumbnailFile, ...payload } = data
+    if (thumbnailFile) {
+      payload.thumbnail = await uploadToCloudinary(
+        thumbnailFile,
+        token,
+        "image"
+      )
+    }
+    const response = await apiConnector("POST", CREATE_COURSE_API, payload, {
       Authorization: `Bearer ${token}`,
     })
     console.log("CREATE COURSE API RESPONSE............", response)
@@ -110,8 +117,15 @@ export const editCourseDetails = async (data, token) => {
   let result = null
   const toastId = toast.loading("Loading...")
   try {
-    const response = await apiConnector("POST", EDIT_COURSE_API, data, {
-      "Content-Type": "multipart/form-data",
+    const { thumbnailFile, ...payload } = data
+    if (thumbnailFile) {
+      payload.thumbnail = await uploadToCloudinary(
+        thumbnailFile,
+        token,
+        "image"
+      )
+    }
+    const response = await apiConnector("POST", EDIT_COURSE_API, payload, {
       Authorization: `Bearer ${token}`,
     })
     console.log("EDIT COURSE API RESPONSE............", response)
@@ -155,9 +169,16 @@ export const createSubSection = async (data, token) => {
   let result = null
   const toastId = toast.loading("Loading...")
   try {
-    const response = await apiConnector("POST", CREATE_SUBSECTION_API, data, {
-      Authorization: `Bearer ${token}`,
-    })
+    const { videoFile, ...payload } = data
+    payload.video = await uploadToCloudinary(videoFile, token, "video")
+    const response = await apiConnector(
+      "POST",
+      CREATE_SUBSECTION_API,
+      payload,
+      {
+        Authorization: `Bearer ${token}`,
+      }
+    )
     console.log("CREATE SUB-SECTION API RESPONSE............", response)
     if (!response?.data?.success) {
       throw new Error("Could Not Add Lecture")
@@ -199,9 +220,18 @@ export const updateSubSection = async (data, token) => {
   let result = null
   const toastId = toast.loading("Loading...")
   try {
-    const response = await apiConnector("POST", UPDATE_SUBSECTION_API, data, {
-      Authorization: `Bearer ${token}`,
-    })
+    const { videoFile, ...payload } = data
+    if (videoFile) {
+      payload.video = await uploadToCloudinary(videoFile, token, "video")
+    }
+    const response = await apiConnector(
+      "POST",
+      UPDATE_SUBSECTION_API,
+      payload,
+      {
+        Authorization: `Bearer ${token}`,
+      }
+    )
     console.log("UPDATE SUB-SECTION API RESPONSE............", response)
     if (!response?.data?.success) {
       throw new Error("Could Not Update Lecture")

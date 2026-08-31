@@ -63,21 +63,21 @@ export default function SubSectionModal({
   const handleEditSubsection = async () => {
     const currentValues = getValues()
     // console.log("changes after editing form values:", currentValues)
-    const formData = new FormData()
-    // console.log("Values After Editing form values:", currentValues)
-    formData.append("sectionId", modalData.sectionId)
-    formData.append("subSectionId", modalData._id)
+    const payload = {
+      sectionId: modalData.sectionId,
+      subSectionId: modalData._id,
+    }
     if (currentValues.lectureTitle !== modalData.title) {
-      formData.append("title", currentValues.lectureTitle)
+      payload.title = currentValues.lectureTitle
     }
     if (currentValues.lectureDesc !== modalData.description) {
-      formData.append("description", currentValues.lectureDesc)
+      payload.description = currentValues.lectureDesc
     }
-    if (currentValues.lectureVideo !== modalData.videoUrl) {
-      formData.append("video", currentValues.lectureVideo)
+    if (currentValues.lectureVideo instanceof File) {
+      payload.videoFile = currentValues.lectureVideo
     }
     setLoading(true)
-    const result = await updateSubSection(formData, token)
+    const result = await updateSubSection(payload, token)
     if (result) {
       // console.log("result", result)
       // update the structure of course
@@ -104,13 +104,14 @@ export default function SubSectionModal({
       return
     }
 
-    const formData = new FormData()
-    formData.append("sectionId", modalData)
-    formData.append("title", data.lectureTitle)
-    formData.append("description", data.lectureDesc)
-    formData.append("video", data.lectureVideo)
+    const payload = {
+      description: data.lectureDesc,
+      sectionId: modalData,
+      title: data.lectureTitle,
+      videoFile: data.lectureVideo,
+    }
     setLoading(true)
-    const result = await createSubSection(formData, token)
+    const result = await createSubSection(payload, token)
     if (result) {
       // update the structure of course
       const updatedCourseContent = course.courseContent.map((section) =>

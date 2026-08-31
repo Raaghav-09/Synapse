@@ -39,12 +39,10 @@ export default function ChangeProfilePicture() {
 
   const handleFileUpload = () => {
     try {
+      if (!imageFile) return
       console.log("uploading...")
       setLoading(true)
-      const formData = new FormData()
-      formData.append("displayPicture", imageFile)
-      // console.log("formdata", formData)
-      dispatch(updateDisplayPicture(token, formData)).then(() => {
+      dispatch(updateDisplayPicture(token, imageFile)).then(() => {
         setLoading(false)
       })
     } catch (error) {
@@ -79,11 +77,12 @@ export default function ChangeProfilePicture() {
               <button
                 onClick={handleClick}
                 disabled={loading}
-                className="cursor-pointer rounded-md bg-richblack-700 py-2 px-5 font-semibold text-richblack-50"
+                className="cursor-pointer rounded-md bg-richblack-700 px-5 py-2 font-semibold text-richblack-50"
               >
                 Select
               </button>
               <IconBtn
+                disabled={loading || !imageFile}
                 text={loading ? "Uploading..." : "Upload"}
                 onclick={handleFileUpload}
               >

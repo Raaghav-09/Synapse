@@ -44,14 +44,14 @@ export default function PublishCourse() {
       goToCourses()
       return
     }
-    const formData = new FormData()
-    formData.append("courseId", course._id)
     const courseStatus = getValues("public")
       ? COURSE_STATUS.PUBLISHED
       : COURSE_STATUS.DRAFT
-    formData.append("status", courseStatus)
     setLoading(true)
-    const result = await editCourseDetails(formData, token)
+    const result = await editCourseDetails(
+      { courseId: course._id, status: courseStatus },
+      token
+    )
     if (result) {
       goToCourses()
     }
@@ -90,7 +90,7 @@ export default function PublishCourse() {
             disabled={loading}
             type="button"
             onClick={goBack}
-            className="flex cursor-pointer items-center gap-x-2 rounded-md bg-richblack-300 py-[8px] px-[20px] font-semibold text-richblack-900"
+            className="flex cursor-pointer items-center gap-x-2 rounded-md bg-richblack-300 px-[20px] py-[8px] font-semibold text-richblack-900"
           >
             Back
           </button>

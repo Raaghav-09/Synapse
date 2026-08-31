@@ -89,46 +89,43 @@ export default function CourseInformationForm() {
       // console.log("Has Form Changed:", isFormUpdated())
       if (isFormUpdated()) {
         const currentValues = getValues()
-        const formData = new FormData()
+        const payload = { courseId: course._id }
         // console.log(data)
-        formData.append("courseId", course._id)
         if (currentValues.courseTitle !== course.courseName) {
-          formData.append("courseName", data.courseTitle)
+          payload.courseName = data.courseTitle
         }
         if (currentValues.courseShortDesc !== course.courseDescription) {
-          formData.append("courseDescription", data.courseShortDesc)
+          payload.courseDescription = data.courseShortDesc
         }
         if (currentValues.coursePrice !== course.price) {
-          formData.append("price", data.coursePrice)
+          payload.price = data.coursePrice
         }
         if (currentValues.courseTags.toString() !== course.tag.toString()) {
-          formData.append("tag", JSON.stringify(data.courseTags))
+          payload.tag = data.courseTags
         }
         if (currentValues.courseBenefits !== course.whatYouWillLearn) {
-          formData.append("whatYouWillLearn", data.courseBenefits)
+          payload.whatYouWillLearn = data.courseBenefits
         }
-        if (currentValues.courseCategory._id !== course.category._id) {
-          formData.append("category", data.courseCategory)
+        const currentCategoryId =
+          currentValues.courseCategory?._id || currentValues.courseCategory
+        if (currentCategoryId !== course.category._id) {
+          payload.category = data.courseCategory?._id || data.courseCategory
         }
         if (
           currentValues.courseRequirements.toString() !==
           course.instructions.toString()
         ) {
-          formData.append(
-            "instructions",
-            JSON.stringify(data.courseRequirements)
-          )
+          payload.instructions = data.courseRequirements
         }
         // only send a thumbnail when a new file was actually picked
         if (
           currentValues.courseImage !== course.thumbnail &&
           data.courseImage instanceof File
         ) {
-          formData.append("thumbnailImage", data.courseImage)
+          payload.thumbnailFile = data.courseImage
         }
-        // console.log("Edit Form data: ", formData)
         setLoading(true)
-        const result = await editCourseDetails(formData, token)
+        const result = await editCourseDetails(payload, token)
         setLoading(false)
         if (result) {
           dispatch(setStep(2))
@@ -140,21 +137,21 @@ export default function CourseInformationForm() {
       return
     }
 
-    const formData = new FormData()
-    formData.append("courseName", data.courseTitle)
-    formData.append("courseDescription", data.courseShortDesc)
-    formData.append("price", data.coursePrice)
-    formData.append("tag", JSON.stringify(data.courseTags))
-    formData.append("whatYouWillLearn", data.courseBenefits)
-    formData.append("category", data.courseCategory)
-    formData.append("status", COURSE_STATUS.DRAFT)
-    formData.append("instructions", JSON.stringify(data.courseRequirements))
-    // thumbnail is optional — appending a null here would send the string "null"
+    const payload = {
+      category: data.courseCategory,
+      courseDescription: data.courseShortDesc,
+      courseName: data.courseTitle,
+      instructions: data.courseRequirements,
+      price: data.coursePrice,
+      status: COURSE_STATUS.DRAFT,
+      tag: data.courseTags,
+      whatYouWillLearn: data.courseBenefits,
+    }
     if (data.courseImage instanceof File) {
-      formData.append("thumbnailImage", data.courseImage)
+      payload.thumbnailFile = data.courseImage
     }
     setLoading(true)
-    const result = await addCourseDetails(formData, token)
+    const result = await addCourseDetails(payload, token)
     if (result) {
       dispatch(setStep(2))
       dispatch(setCourse(result))
@@ -306,7 +303,7 @@ export default function CourseInformationForm() {
           <button
             onClick={() => dispatch(setStep(2))}
             disabled={loading}
-            className={`flex cursor-pointer items-center gap-x-2 rounded-md bg-richblack-300 py-[8px] px-[20px] font-semibold text-richblack-900`}
+            className={`flex cursor-pointer items-center gap-x-2 rounded-md bg-richblack-300 px-[20px] py-[8px] font-semibold text-richblack-900`}
           >
             Continue Wihout Saving
           </button>
