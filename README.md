@@ -49,7 +49,7 @@ The headline feature is the **AI Course Doubt Assistant**: a chat panel inside t
 ### Platform
 - **Authentication & authorization** — JWT sessions (24h expiry, httpOnly cookie), email OTP verification on signup with **MongoDB TTL auto-expiry**, bcrypt password hashing (cost 10), and role-based access control middleware.
 - **Course management** — nested content model (Course → Sections → Lectures), video uploads to Cloudinary, draft/published states, category catalog. Course thumbnails are optional and fall back to a generated placeholder.
-- **Payments** — Razorpay order creation, signature-verified fulfilment from the checkout callback, plus a hardened webhook as a secondary path.
+- **Payments** — backend Razorpay order creation, verified webhook enrollment, saved purchase records, and an authenticated frontend confirmation screen.
 - **Learning experience** — video player with per-student lecture completion tracking, course progress that survives reloads, ratings & reviews.
 - **Password reset** — `crypto.randomBytes` token emailed as a link, expiring after 1 hour.
 - **Contact form** — public endpoint that sends an auto-acknowledgement to the visitor and a notification to the site owner.
@@ -117,7 +117,7 @@ flowchart LR
     SVC --> GEMINI
     CTRL --> RZP
     CTRL --> MAIL
-    RZP -. "webhook (secondary)" .-> MW
+    RZP -. "webhook (fulfillment)" .-> MW
 ```
 
 ### Component responsibilities
@@ -211,39 +211,39 @@ sequenceDiagram
 
 ### Payment — request lifecycle
 
-Enrollment is granted only after a signature the browser cannot forge. The client callback is the primary path (works anywhere, no public URL needed); the webhook is a secondary, authoritative path for when the browser never comes back.
+Razorpay orders are created on the backend and saved in the `Payment` collection with the buyer, purchased courses, and amount in paise. Only a signed `payment.captured` or `order.paid` webhook can fulfill an order. The browser callback opens a status page; it cannot grant enrollment or send receipts.
 
 ```mermaid
 sequenceDiagram
-    autonumber
     actor S as Student
-    participant FE as BuyCourse()
+    participant FE as React frontend
     participant API as Express API
     participant RZP as Razorpay
     participant DB as MongoDB
-
-    S->>FE: clicks "Buy Now" / cart checkout
-    FE->>API: POST /payment/capturePayment { courses: [...] }
-    API->>API: validate ids, reject if already enrolled
-    API->>RZP: orders.create({ amount: total×100, currency: INR })
-    RZP-->>API: { id, amount, currency }
-    API-->>FE: { success, data: order }
-
-    FE->>RZP: open Checkout with order_id
-    S->>RZP: pays (card / UPI / netbanking)
-    RZP-->>FE: handler({ order_id, payment_id, signature })
-
-    FE->>API: POST /payment/verifyPayment
-    API->>API: HMAC-SHA256(order_id|payment_id, RAZORPAY_SECRET)<br/>timing-safe compare → 400 on mismatch
-    API->>DB: $addToSet course.studentsEnrolled<br/>$addToSet user.courses
-    API-->>FE: 200 { success }
-    FE->>S: redirect to /dashboard/enrolled-courses
-
-    Note over RZP,API: Secondary path — fires even if the browser closed
-    RZP-->>API: POST /payment/verifySignature (webhook)
-    API->>API: HMAC over RAW body, timing-safe compare
-    API->>DB: same idempotent enrollment
+    S->>FE: Buy Now / cart checkout
+    FE->>API: POST /payment/createOrder { courses }
+    API->>DB: Validate published courses; read prices
+    API->>RZP: orders.create(amount in paise, INR)
+    RZP-->>API: order id, amount, currency
+    API->>DB: Persist order → buyer, courses, amount
+    API-->>FE: order id + public key id + amount + currency
+    FE->>RZP: Open Checkout with order_id
+    S->>RZP: Complete payment
+    RZP-->>FE: Checkout success callback
+    FE->>FE: Open /dashboard/payment/:orderId
+    RZP->>API: POST /payment/verifySignature
+    API->>API: Verify raw-body HMAC with webhook secret
+    API->>DB: Match order id, captured state, amount, currency
+    API->>DB: Idempotent memberships; mark fulfilled
+    API-->>RZP: Acknowledge webhook
+    loop Until fulfilled or two-minute UI wait expires
+        FE->>API: GET /payment/orders/:orderId (authenticated owner)
+        API-->>FE: created / paid / fulfilled
+    end
+    FE->>S: Access ready; link to enrolled courses
 ```
+
+See [payment setup and testing](docs/razorpay-payments.md). Webhook setup and automatic capture are required. Order creation refuses new purchases when `RAZORPAY_WEBHOOK_SECRET` is missing. Closing the browser does not prevent webhook enrollment. The status page can be reloaded, and offers another check after its two-minute wait; a timeout does not mark a payment failed.
 
 ### Key implementation details
 
@@ -252,8 +252,8 @@ sequenceDiagram
 | Token-cost ceiling | Hard caps: 1,000-char question, 8,000-char context, 10-message history, 1,024 output tokens | `controllers/DoubtAssistant.js`, `config/gemini.js` |
 | Context relevance under truncation | Currently-playing lecture is `unshift`ed to the front of the context before the 8K slice | `buildCourseContext()` |
 | Abuse prevention | In-memory sliding-window limiter, per user id (documented upgrade path: Redis) | `doubtRateLimiter` middleware |
-| Payment authenticity | HMAC-SHA256 signature, compared with `crypto.timingSafeEqual` | `controllers/Payments.js` |
-| Idempotent enrollment | `$addToSet` instead of `$push`, so duplicate webhook delivery cannot double-enroll | `enrollStudents()` |
+| Payment authenticity | Raw-body webhook HMAC plus a server-owned order/buyer/course/amount mapping | `controllers/Payments.js`, `models/Payment.js` |
+| Idempotent enrollment | `$addToSet` plus an atomic fulfilled-status transition prevents duplicate membership and email attempts | `fulfillPayment()` |
 | Webhook correctness | HMAC computed over `req.rawBody` (captured by an `express.json` verify hook), not a re-serialized body | `index.js`, `verifySignature` |
 | Concurrent-safe progress | Single atomic `findOneAndUpdate` with `upsert` — no check-then-act race against the unique index | `controllers/CourseProgress.js` |
 | OTP replay & brute force | Deleted on successful use; destroyed after 5 failed attempts | `controllers/Auth.js`, `models/OTP.js` |
@@ -265,8 +265,8 @@ sequenceDiagram
 ```
 /assistant/ask               auth → isStudent → doubtRateLimiter → askDoubt
 /assistant/history/:id       auth → isStudent → getChatHistory
-/payment/capturePayment      auth → isStudent → capturePayment
-/payment/verifyPayment       auth → isStudent → verifyPayment
+/payment/createOrder         auth → isStudent → createOrder
+/payment/orders/:orderId     auth → isStudent → getOrderStatus (owner only)
 /payment/verifySignature     (no auth — authenticates via HMAC signature)
 /course/updateCourseProgress auth → isStudent → updateCourseProgress
 /course/createCourse         auth → isInstructor → createCourse
@@ -320,7 +320,7 @@ Runs on `http://localhost:3000`.
 | `CONTACT_MAIL_TO` | Optional — inbox for contact-form notifications (falls back to `MAIL_USER`) |
 | `CLOUD_NAME`, `API_KEY`, `API_SECRET`, `FOLDER_NAME` | Cloudinary media uploads |
 | `RAZORPAY_KEY`, `RAZORPAY_SECRET` | Payment gateway (use `rzp_test_*` keys — free, no KYC) |
-| `RAZORPAY_WEBHOOK_SECRET` | Only needed if you register the webhook in the Razorpay dashboard |
+| `RAZORPAY_WEBHOOK_SECRET` | Required; must match the registered webhook secret |
 | `GEMINI_API_KEY` | Gemini API key — **leave as the placeholder to run in stub mode** |
 | `GEMINI_MODEL` | Gemini model id (default `gemini-flash-latest`) |
 | `NODE_ENV` | Set to `production` on a deployed instance — switches cookies to `SameSite=None; Secure` |
@@ -330,7 +330,7 @@ Runs on `http://localhost:3000`.
 | Variable | Purpose |
 |---|---|
 | `REACT_APP_BASE_URL` | Backend API base, e.g. `http://localhost:4000/api/v1` |
-| `REACT_APP_RAZORPAY_KEY` | Razorpay **key id** (public by design — it is sent to the browser) |
+| `REACT_APP_RAZORPAY_KEY` | Legacy setting; Checkout now uses the public key id returned by the backend |
 
 `.env` is gitignored in both folders; `server/.env.sample` documents every variable with placeholders.
 
@@ -378,7 +378,7 @@ All routes are mounted under `/api/v1` — **39 REST endpoints across 6 routers*
 | User | `/auth` | 6 | signup, login, sendotp, changepassword, reset-password flow |
 | Profile | `/profile` | 6 | user details, enrolled courses, instructor dashboard, display picture |
 | Course | `/course` | 20 | course/section/lecture CRUD, categories, ratings & reviews, **progress tracking** |
-| Payments | `/payment` | 4 | capturePayment, **verifyPayment**, **sendPaymentSuccessEmail**, verifySignature (webhook) |
+| Payments | `/payment` | 6 | createOrder, capturePayment (alias), orders/:orderId (status), verifySignature (webhook), two retired browser endpoints (410) |
 | Assistant | `/assistant` | 2 | `POST /ask`, `GET /history/:courseId` |
 | Contact | `/contact` | 1 | `POST /contactus` (public) |
 
@@ -448,12 +448,12 @@ Checklist:
 1. **`CORS_ORIGIN`** — set to the deployed frontend URL on the backend host. The default only allows `localhost:3000`.
 2. **`CLIENT_URL`** — set to the deployed frontend URL so password-reset emails do not point to localhost.
 3. **`REACT_APP_BASE_URL`** — set to the deployed API URL **before the frontend build runs**. CRA inlines it at build time; setting it afterwards has no effect until you rebuild.
-4. **`REACT_APP_RAZORPAY_KEY`** — same, must be present at build time.
+4. **Razorpay key** — Checkout uses the public key id returned by the backend, ensuring the same account/mode creates and pays the order.
 5. **`NODE_ENV=production`** on the backend — switches the auth cookie to `SameSite=None; Secure`, which browsers require when the SPA and API are on different sites.
 6. **Secrets** — set every `server/.env` value in the host's environment settings. Never commit `.env`.
 7. **Free-tier cold starts** — instances that sleep after inactivity will delay webhook delivery (Razorpay retries) and add latency to the first request.
 
-The payment flow works without any public URL, because enrollment is fulfilled from the signature-verified checkout callback. The webhook is optional; register it in the Razorpay dashboard and set `RAZORPAY_WEBHOOK_SECRET` only if you want the secondary path active.
+The payment flow requires a public webhook URL. Register `/api/v1/payment/verifySignature`, subscribe to `payment.captured`, configure the matching `RAZORPAY_WEBHOOK_SECRET`, and enable automatic capture. See `docs/razorpay-payments.md`.
 
 ---
 
@@ -462,7 +462,7 @@ The payment flow works without any public URL, because enrollment is fulfilled f
 A few choices worth calling out, and their trade-offs:
 
 - **Grounding via prompt-injected context instead of a vector DB.** Course content is small enough (≤8K chars after truncation) that stuffing it into the system prompt beats the operational cost of embeddings + retrieval. The current-lecture-first ordering is a cheap relevance heuristic that does most of what a retriever would. If courses grew large, the upgrade path is chunked embeddings with retrieval scoped per course.
-- **Client-callback payment verification, with the webhook as a backstop.** The callback path needs no public URL, so it works identically on localhost and in production. Its weakness is real — if the user closes the tab after paying, the callback never fires — which is exactly why the webhook exists as a second, authoritative path.
+- **Webhook-only payment fulfillment.** Checkout callbacks only open the confirmation screen. A signed captured-payment webhook binds the order to its saved buyer, courses, and amount before enrollment. This requires a publicly reachable webhook endpoint and works even when the browser closes after payment.
 - **In-memory rate limiter.** Deliberately simple: a `Map` of user id → timestamps with a sliding window. Known limitation (documented in code): per-process, resets on restart, doesn't share across instances. Upgrade path: Redis sliding window.
 - **Database-enforced invariants over application checks.** OTP expiry, unique email, one-chat-per-(student, course), and one-progress-per-(student, course) are all indexes. The database guarantees these even if application code regresses.
 - **Atomic upserts over check-then-act.** Progress records use a single `findOneAndUpdate({ upsert: true })` rather than find-then-create, so concurrent requests cannot race into a duplicate-key error.
