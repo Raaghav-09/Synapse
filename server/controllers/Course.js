@@ -181,6 +181,7 @@ exports.getCourseDetails = async (req, res) => {
                                             path:"courseContent",
                                             populate:{
                                                 path:"subSection",
+                                                select: "-videoUrl",
                                             },
                                         })
                                         .exec();
@@ -406,6 +407,15 @@ exports.getFullCourseDetails = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: `Could not find course with id: ${courseId}`,
+      })
+    }
+
+    const isEnrolled = courseDetails.studentsEnrolled.some((id) => String(id) === userId)
+    const isOwner = String(courseDetails.instructor?._id) === userId
+    if (!isEnrolled && !isOwner && req.user.accountType !== "Admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Enroll in this course before accessing its lessons",
       })
     }
 
