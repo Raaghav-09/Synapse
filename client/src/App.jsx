@@ -24,6 +24,7 @@ import About from "./pages/About"
 import Catalog from "./pages/Catalog"
 import Contact from "./pages/Contact"
 import CourseDetails from "./pages/CourseDetails"
+import PaymentStatus from "./pages/PaymentStatus"
 import Dashboard from "./pages/Dashboard"
 import Error from "./pages/Error"
 import ForgotPassword from "./pages/ForgotPassword"
@@ -131,6 +132,7 @@ function App() {
                 element={<EnrolledCourses />}
               />
               <Route path="/dashboard/cart" element={<Cart />} />
+              <Route path="dashboard/payment/:orderId" element={<PaymentStatus />} />
             </>
           )}
           {/* Route only for Admins */}

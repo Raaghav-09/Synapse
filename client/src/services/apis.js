@@ -64,9 +64,8 @@ export const uploadEndpoints = {
 }
 
 export const studentEndpoints = {
-  COURSE_PAYMENT_API: "/payment/capturePayment",
-  COURSE_VERIFY_API: "/payment/verifyPayment",
-  SEND_PAYMENT_SUCCESS_EMAIL_API: "/payment/sendPaymentSuccessEmail",
+  COURSE_PAYMENT_API: "/payment/createOrder",
+  COURSE_PAYMENT_STATUS_API: "/payment/orders",
 }
 
 export const adminEndpoints = {
